@@ -1,4 +1,4 @@
-module github.com/Jeffersonmf/go-workers
+module go-workers
 
 go 1.21
 
