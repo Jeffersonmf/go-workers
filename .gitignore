@@ -19,3 +19,8 @@
 
 # Go workspace file
 go.work
+
+tractian-go-workers
+.env
+.vscode/
+launch.json
