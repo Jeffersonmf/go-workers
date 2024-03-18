@@ -4,8 +4,6 @@ import (
 	"errors"
 
 	"go-workers/internal/util"
-
-	"go-workers/internal/telemetry"
 )
 
 type WorkerError struct {
@@ -22,7 +20,6 @@ func (e *WorkerError) RegisterMetricsCount(
 	errorTags []string,
 ) {
 	e.msg = errorTags[0]
-	telemetry.TickErrorCount(errorName, count, errorTags)
 }
 
 func (e *WorkerError) Error() string {

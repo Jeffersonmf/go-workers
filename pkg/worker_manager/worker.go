@@ -2,10 +2,8 @@ package workermanager
 
 import (
 	"context"
-	"fmt"
 	"time"
 
-	"go-workers/internal/telemetry"
 	"go-workers/internal/util"
 
 	"go.uber.org/zap"
@@ -77,13 +75,13 @@ func (wr *Worker) doWorkContext(execsCount int) {
 	chPostExecutionFail := make(chan bool, 1)
 
 	executor := func(ctx context.Context, taskArg TaskParams) {
-		start := time.Now()
+		//start := time.Now()
 		callbackResult, err := wr.Instrumentation.FuncDispatcher(
 			ctx,
 			taskArg)
 
-		end := time.Now()
-		executionTime := end.Sub(start)
+		//end := time.Now()
+		//executionTime := end.Sub(start)
 		currentTick, _ := taskArg.GetIntParam("currentTick")
 
 		if err != nil {
@@ -99,14 +97,6 @@ func (wr *Worker) doWorkContext(execsCount int) {
 			)
 			chPostExecutionFail <- true
 		} else {
-
-			telemetry.AddTickHistogram(
-				"cockroachdb.testharnness.workermanager.execution_time",
-				float64(executionTime.Milliseconds()),
-				[]string{
-					fmt.Sprintf("function_name:%s", wr.Instrumentation.FuncName),
-				},
-			)
 
 			if wr.Instrumentation.NestedCallback != nil {
 				err := wr.Instrumentation.NestedCallback(
@@ -141,13 +131,13 @@ func (wr *Worker) doWorkContextWithoutTickDuration() {
 	chPostExecutionFail := make(chan bool, 1)
 
 	executor := func(ctx context.Context, taskArg TaskParams) {
-		start := time.Now()
+		//start := time.Now()
 		callbackResult, err := wr.Instrumentation.FuncDispatcher(
 			ctx,
 			taskArg)
 
-		end := time.Now()
-		executionTime := end.Sub(start)
+		//end := time.Now()
+		//executionTime := end.Sub(start)
 
 		if err != nil {
 
@@ -161,14 +151,6 @@ func (wr *Worker) doWorkContextWithoutTickDuration() {
 			)
 			chPostExecutionFail <- true
 		} else {
-
-			telemetry.AddTickHistogram(
-				"workermanager.execution_time",
-				float64(executionTime.Milliseconds()),
-				[]string{
-					fmt.Sprintf("function_name:%s", wr.Instrumentation.FuncName),
-				},
-			)
 
 			if wr.Instrumentation.NestedCallback != nil {
 				err := wr.Instrumentation.NestedCallback(

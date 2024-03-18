@@ -3,7 +3,6 @@ module go-workers
 go 1.21
 
 require (
-	github.com/DataDog/datadog-go/v5 v5.5.0
 	github.com/fsnotify/fsnotify v1.7.0
 	github.com/spf13/viper v1.18.2
 	go.uber.org/zap v1.27.0
@@ -18,7 +17,6 @@ require (
 )
 
 require (
-	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/go-co-op/gocron v1.37.0
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
