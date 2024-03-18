@@ -3,8 +3,9 @@ package workermanager
 import (
 	"errors"
 
-	"github.com/Jeffersonmf/go-workers/internal/telemetry"
-	"github.com/tractian/tractian-go-workers/internal/pkg/util"
+	"go-workers/internal/util"
+
+	"go-workers/internal/telemetry"
 )
 
 type WorkerError struct {

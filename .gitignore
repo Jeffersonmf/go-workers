@@ -20,7 +20,7 @@
 # Go workspace file
 go.work
 
-tractian-go-workers
+go-workers
 .env
 .vscode/
 launch.json

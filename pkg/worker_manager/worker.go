@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"internal/util"
+	"go-workers/internal/telemetry"
+	"go-workers/internal/util"
 
-	"github.com/Jeffersonmf/go-workers/internal/telemetry"
 	"go.uber.org/zap"
 )
 

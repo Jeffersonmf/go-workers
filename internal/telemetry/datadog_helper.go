@@ -2,10 +2,10 @@ package telemetry
 
 import (
 	"fmt"
+	"go-workers/internal/util"
 	"strings"
 
 	"github.com/DataDog/datadog-go/v5/statsd"
-	"github.com/Jeffersonmf/go-workers/internal/util"
 )
 
 var _dataDogClient *statsd.Client

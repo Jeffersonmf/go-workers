@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"go-workers/internal/util"
+
 	"github.com/go-co-op/gocron"
-	"github.com/tractian/tractian-go-workers/internal/pkg/util"
 )
 
 type TypeOfExecution int64
