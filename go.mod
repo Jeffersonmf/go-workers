@@ -1,6 +1,6 @@
 module github.com/Jeffersonmf/go-workers
 
-go 1.21
+go 1.22.1
 
 require (
 	github.com/fsnotify/fsnotify v1.7.0
