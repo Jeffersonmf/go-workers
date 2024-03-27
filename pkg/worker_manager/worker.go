@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/Jeffersonmf/go-workers/internal/util"
+	"github.com/Jeffersonmf/go-workers/pkg/util"
 
 	"go.uber.org/zap"
 )

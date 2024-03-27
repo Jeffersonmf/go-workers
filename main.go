@@ -1,6 +1,6 @@
 package main
 
-import "github.com/Jeffersonmf/go-workers/internal/util"
+import "github.com/Jeffersonmf/go-workers/pkg/util"
 
 func init() {
 }

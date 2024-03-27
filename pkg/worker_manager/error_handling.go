@@ -3,7 +3,7 @@ package workermanager
 import (
 	"errors"
 
-	"github.com/Jeffersonmf/go-workers/internal/util"
+	"github.com/Jeffersonmf/go-workers/pkg/util"
 )
 
 type WorkerError struct {

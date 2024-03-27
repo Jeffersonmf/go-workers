@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Jeffersonmf/go-workers/internal/util"
+	"github.com/Jeffersonmf/go-workers/pkg/util"
 
 	"github.com/go-co-op/gocron"
 )
