@@ -1,13 +1,3 @@
----
-  __Advertisement :)__
-
-  __[Jeffersonmf/go-workers](https://github.com/Jeffersonmf/go-workers)__
-  - Project with the purpose of managing and sharing different and general
-  contracts and data structures between projects.
-  For now these are the dependencies to others repositories.
-
----
-
 # Go-Workers
 [![License](https://img.shields.io/badge/license-NDA-blue)](https://github.com/libsql/libsql/blob/master/LICENSE.md) [![License](https://img.shields.io/badge/build-valid-red)](https://github.com/libsql/libsql/blob/master/LICENSE.md) [![GoDoc](https://godoc.org/github.com/jessevdk/go-flags?status.png)]() [![](https://img.shields.io/coveralls/jessevdk/go-flags.svg)]() [![Up to Date](https://github.com/ikatyang/emoji-cheat-sheet/workflows/Up%20to%20Date/badge.svg)]() 
 
