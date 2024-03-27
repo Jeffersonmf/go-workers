@@ -1,4 +1,4 @@
-module github.com/Jeffersonmf/go-workers
+module github.com/Jeffersonmf/go-workers/v2
 
 go 1.22.1
 
