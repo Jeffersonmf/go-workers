@@ -14,8 +14,6 @@ Below, we have an example of the definitions of the main data structures of the 
 
 ### Extra Modules
 
-![Project Tree](./project_tree.png)
-
 - **Configurations**[]()
   - *Here we have modules capable of reading configuration in .env files and generic functions for dealing with the "environment"*
 
