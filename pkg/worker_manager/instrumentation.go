@@ -2,6 +2,7 @@ package workermanager
 
 import (
 	"context"
+	"database/sql"
 )
 
 type TaskParams struct {
@@ -34,12 +35,21 @@ func (t *TaskParams) SetBytesParam(key string, value []byte) {
 	t.Params[key] = value
 }
 
+func (t *TaskParams) SetRowsParam(key string, value *sql.Rows) {
+	t.Params[key] = value
+}
+
 func (t *TaskParams) SetComplexParam(key string, value *any) {
 	t.Params[key] = value
 }
 
 func (t *TaskParams) GetComplexParam(key string) (*any, bool) {
 	value, ok := t.Params[key].(*any)
+	return value, ok
+}
+
+func (t *TaskParams) GetRowsParam(key string) (*sql.Rows, bool) {
+	value, ok := t.Params[key].(*sql.Rows)
 	return value, ok
 }
 
