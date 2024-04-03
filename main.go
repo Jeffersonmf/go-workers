@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 
-	"github.com/Jeffersonmf/go-workers/v2/pkg/util"
-	workermanager "github.com/Jeffersonmf/go-workers/v2/pkg/worker_manager"
+	"github.com/Jeffersonmf/go-workers/v3/pkg/util"
+	workermanager "github.com/Jeffersonmf/go-workers/v3/pkg/worker_manager"
 )
 
 func init() {
