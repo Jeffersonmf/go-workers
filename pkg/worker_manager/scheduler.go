@@ -1,67 +1,73 @@
 package workermanager
 
 import (
-	"fmt"
+	"context"
 	"time"
-
-	"github.com/Jeffersonmf/go-workers/v3/pkg/util"
-	"github.com/go-co-op/gocron"
 )
 
-type TypeOfExecution int64
+// TypeOfExecution selects whether a scheduled Worker blocks the
+// calling goroutine (Sync) or runs in the background (Async).
+type TypeOfExecution int
 
+const (
+	// ExecutionAsync runs the schedule in a background goroutine; the
+	// caller of Worker.Run gets control back immediately.
+	ExecutionAsync TypeOfExecution = iota
+	// ExecutionSync blocks the calling goroutine until the Worker's
+	// context is cancelled.
+	ExecutionSync
+)
+
+// TypeOfExecutionEnum mirrors the previous struct-literal enum
+// (TypeOfExecutionEnum.Async / TypeOfExecutionEnum.Sync) so it reads
+// the same at call sites as before, backed now by real typed
+// constants instead of package-level struct fields.
 var TypeOfExecutionEnum = struct {
 	Async TypeOfExecution
 	Sync  TypeOfExecution
-}{Async: 0,
-	Sync: 1}
+}{Async: ExecutionAsync, Sync: ExecutionSync}
 
+// CronSchedulerConfig makes a Worker run on a fixed interval instead of
+// once. IntervalInSeconds must be greater than zero for scheduling to
+// take effect; see Worker.Run.
 type CronSchedulerConfig struct {
 	IntervalInSeconds int
 	TypeOfExecution   TypeOfExecution
 }
 
-func init() {
-}
+// runOnSchedule runs fn immediately, then again every interval, until
+// ctx is cancelled. There is no separate Stop function: ctx
+// cancellation is already how the rest of this package propagates
+// shutdown (a Worker's SourceContext flows into every task it runs),
+// so the scheduler follows that same convention instead of
+// introducing a second, unrelated way to stop things.
+//
+// This replaced go-co-op/gocron (and its transitive dependency on a
+// second cron implementation, robfig/cron), which existed only to do
+// "run a function every N seconds" — exactly what the standard
+// library's time.Ticker already does, with the benefit of composing
+// naturally with context cancellation instead of needing its own
+// Stop mechanism.
+func runOnSchedule(ctx context.Context, interval time.Duration, execType TypeOfExecution, fn func()) {
+	run := func() {
+		fn()
 
-func AddNewCronExecution(wr Worker) {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
 
-	var scheduler = gocron.NewScheduler(time.UTC)
-
-	// Every starts the job immediately and then runs at the
-	// specified interval
-	job, err := scheduler.Every(wr.CronSchedulerConfig.IntervalInSeconds).Seconds().Do(func() {
-		wr.blockToRun()
-	})
-	if err != nil {
-		util.Sugar.Infof(err.Error())
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				fn()
+			}
+		}
 	}
 
-	job.Name(fmt.Sprintf("Job Scheduled at %s", time.Now().String()))
-
-	switch wr.CronSchedulerConfig.TypeOfExecution {
-	case TypeOfExecutionEnum.Async:
-		scheduler.StartAsync()
-	case TypeOfExecutionEnum.Sync:
-		scheduler.StartBlocking()
-	default:
-		scheduler.StartAsync()
+	if execType == ExecutionAsync {
+		go run()
+		return
 	}
-}
-
-func StopCronExecution(wr *Worker, scheduler *gocron.Scheduler) {
-	wr.CronSchedulerConfig.IntervalInSeconds = -1
-	scheduler.StopBlockingChan()
-}
-
-func MakeSchedulerAnchorPoint() {
-	var schedulerInternal = gocron.NewScheduler(time.UTC)
-	job, err := schedulerInternal.Every(10).Milliseconds().Do(func() {
-	})
-	if err != nil {
-		util.Sugar.Infof(err.Error())
-	}
-	job.Name(fmt.Sprintf("Internal Block Job had been created at %s", time.Now().String()))
-	util.Sugar.Infof(fmt.Sprintf("Internal Block Job had been created at %s", time.Now().String()))
-	schedulerInternal.StartBlocking()
+	run()
 }

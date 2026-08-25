@@ -1,41 +1,32 @@
 package util
 
 import (
-	"context"
-	"os/exec"
 	"runtime"
-	"time"
+
+	"github.com/google/uuid"
 )
 
-func UUIDGenerate() string {
-	newUUID, err := exec.Command("uuidgen").Output()
-	if err != nil {
-		Sugar.Infof(err.Error())
-	}
-
-	return string(newUUID)
+// NewUUID returns a new random (v4) UUID. It replaced a previous
+// implementation that shelled out to the `uuidgen` CLI: that only
+// works on hosts where the binary happens to be installed (notably
+// absent from minimal container images), spawns a process for
+// something the standard library ecosystem already does in-process,
+// and silently returned an empty string on error instead of failing
+// loudly.
+func NewUUID() string {
+	return uuid.NewString()
 }
 
-// any potentially blocking task should take a context
-// style: context should be the first passed in parameter
-func PipesTask(ctx context.Context, poll time.Duration) {
-	Sugar.Infof("Running...")
-	select {
-	case <-ctx.Done():
-		Sugar.Infof("Done...")
-		break
-	default:
-		for {
-			time.Sleep(poll * time.Millisecond)
-		}
-	}
-}
-
-func PrintStats(mem runtime.MemStats) {
+// LogMemStats logs a snapshot of the current Go runtime memory
+// statistics, useful for spot-checking a worker's memory footprint
+// during development.
+func LogMemStats() {
+	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
-	Sugar.Infof("mem.Alloc:", mem.Alloc)
-	Sugar.Infof("mem.TotalAlloc:", mem.TotalAlloc)
-	Sugar.Infof("mem.HeapAlloc:", mem.HeapAlloc)
-	Sugar.Infof("mem.NumGC:", mem.NumGC)
-	Sugar.Infof("-----")
+	Sugar.Infow("memory stats",
+		"allocBytes", mem.Alloc,
+		"totalAllocBytes", mem.TotalAlloc,
+		"heapAllocBytes", mem.HeapAlloc,
+		"numGC", mem.NumGC,
+	)
 }

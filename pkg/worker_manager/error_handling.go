@@ -1,48 +1,27 @@
 package workermanager
 
-import (
-	"errors"
+import "fmt"
 
-	"github.com/Jeffersonmf/go-workers/v3/pkg/util"
-)
-
-type WorkerError struct {
-	msg string
+// TaskError wraps a task execution failure with the task's name and
+// which attempt it was, so an OnError handler or a log line can
+// identify what failed without parsing a formatted message.
+//
+// This replaced the previous WorkerError/ExecutionException pair: that
+// interface declared RegisterMetricsCount(string, int64) error, but
+// the only implementation had a different signature (three parameters,
+// no return value) and so never actually satisfied the interface it
+// was declared against. Nothing in the codebase called it through the
+// interface either; it was dead weight that looked load-bearing.
+type TaskError struct {
+	TaskName string
+	Attempt  int
+	Err      error
 }
 
-type ExecutionException interface {
-	RegisterMetricsCount(errorName string, count int64) error
+func (e *TaskError) Error() string {
+	return fmt.Sprintf("task %q failed on attempt %d: %v", e.TaskName, e.Attempt, e.Err)
 }
 
-func (e *WorkerError) RegisterMetricsCount(
-	errorName string,
-	count int64,
-	errorTags []string,
-) {
-	e.msg = errorTags[0]
-}
-
-func (e *WorkerError) Error() string {
-	return e.msg
-}
-
-func (e WorkerError) ExecutionError(args []string) *error {
-	return new(error)
-}
-
-func WorkerErrorInstance(error string) *WorkerError {
-	return &WorkerError{msg: error}
-}
-
-func CustomErrorInstance() error {
-	return errors.New("not implemented")
-}
-
-func (w WorkerError) ListenErrosHappned() {
-	// defer makes the function run at the end
-	defer func() { // recovers panic
-		if e := recover(); e != nil {
-			util.Sugar.Infof(w.msg)
-		}
-	}()
+func (e *TaskError) Unwrap() error {
+	return e.Err
 }

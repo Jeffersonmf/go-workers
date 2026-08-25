@@ -1,55 +1,67 @@
+// Command go-workers is a runnable example of the workermanager
+// package: a scheduled worker that fetches a batch of records from a
+// source, hands each one off to a second step, and shuts down
+// cleanly on SIGINT/SIGTERM instead of being killed mid-batch.
 package main
 
 import (
 	"context"
+	"fmt"
+	"os/signal"
+	"syscall"
 
-	"github.com/Jeffersonmf/go-workers/v3/pkg/util"
-	workermanager "github.com/Jeffersonmf/go-workers/v3/pkg/worker_manager"
+	"github.com/Jeffersonmf/go-workers/pkg/util"
+	workermanager "github.com/Jeffersonmf/go-workers/pkg/worker_manager"
 )
 
-func init() {
+type record struct {
+	ID   int
+	Name string
 }
 
 func main() {
-	util.Sugar.Infof("The Go-Workers module has been started.")
+	defer util.Sync()
+	util.Sugar.Info("go-workers example starting")
 
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	loadDataStep := func(ctx context.Context, taskArg workermanager.TaskParams) (workermanager.TaskParams, error) {
-		println("Load Data from ReadShift Brand DNB table")
-		return taskArg, nil
+	fetchBatch := func(_ context.Context, _ workermanager.TaskParams) (workermanager.TaskParams, error) {
+		batch := []record{{ID: 1, Name: "first"}, {ID: 2, Name: "second"}}
+
+		result := workermanager.NewTaskParams()
+		workermanager.SetParam(result, "batch", batch)
+		return result, nil
 	}
 
-	writeDataStep := func(ctx context.Context, taskArg workermanager.TaskParams) (workermanager.TaskParams, error) {
-		return taskArg, nil
-	}
+	persistBatch := func(_ context.Context, args workermanager.TaskParams) error {
+		batch, ok := workermanager.GetParam[[]record](args, "batch")
+		if !ok {
+			return fmt.Errorf("expected a []record under \"batch\"")
+		}
 
-	listenCallbackStep := func(ctx context.Context, taskArg workermanager.TaskParams) error {
-		workermanager.Worker{
-
-			SourceContext: ctx,
-			Instrumentation: workermanager.Instrumentation{
-				TaskArguments:  taskArg,
-				FuncDispatcher: writeDataStep,
-				FuncName:       "Step to Write data into Hotdata Database",
-			},
-		}.Run()
-
+		for _, r := range batch {
+			util.Sugar.Infow("persisted record", "id", r.ID, "name", r.Name)
+		}
 		return nil
 	}
 
 	workermanager.Worker{
 		SourceContext: ctx,
 		CronSchedulerConfig: workermanager.CronSchedulerConfig{
-			IntervalInSeconds: 1,
+			IntervalInSeconds: 5,
 			TypeOfExecution:   workermanager.TypeOfExecutionEnum.Sync,
 		},
 		Instrumentation: workermanager.Instrumentation{
 			TaskArguments:  workermanager.NewTaskParams(),
-			FuncDispatcher: loadDataStep,
-			NestedCallback: listenCallbackStep,
-			FuncName:       "Step to Listen Data from Redshift",
+			FuncDispatcher: fetchBatch,
+			NestedCallback: persistBatch,
+			FuncName:       "fetch-and-persist-batch",
+		},
+		OnError: func(err *workermanager.TaskError) {
+			util.Sugar.Errorw("worker step failed", "task", err.TaskName, "attempt", err.Attempt, "error", err.Err)
 		},
 	}.Run()
 
+	util.Sugar.Info("go-workers example stopped")
 }

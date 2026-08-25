@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27"
+          cache: true
+
+      - name: fmt
+        run: test -z "$(gofmt -l .)"
+
+      - name: lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+      # -race exercises exactly the bug class this package had before:
+      # a retry mechanism that raced a channel send against a
+      # non-blocking select in the caller. Plain `go test` alone would
+      # not have caught it.
+      - name: test
+        run: go test ./... -race -cover
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: check
+    steps:
+      - uses: actions/checkout@v4
+      - name: build image
+        run: docker build -t go-workers:ci .
+      - name: smoke test (runs, logs, shuts down cleanly on SIGTERM)
+        run: |
+          id=$(docker run -d go-workers:ci)
+          sleep 2
+          docker logs "$id" | grep -q "go-workers example starting"
+          docker stop "$id"
+          docker wait "$id"

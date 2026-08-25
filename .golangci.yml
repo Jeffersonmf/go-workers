@@ -1,0 +1,18 @@
+version: "2"
+
+linters:
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - gosec
+    - revive
+    - bodyclose
+    - unconvert
+
+formatters:
+  enable:
+    - gofmt
+    - goimports

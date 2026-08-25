@@ -21,6 +21,7 @@
 go.work
 
 go-workers
+/bin/
 .env
 .vscode/
 launch.json

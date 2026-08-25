@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1220"/>
+      <stop offset="100%" stop-color="#131c2e"/>
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#5fd4ea"/>
+      <stop offset="100%" stop-color="#00acd7"/>
+    </linearGradient>
+    <linearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6fa8f5"/>
+      <stop offset="100%" stop-color="#3a6fd8"/>
+    </linearGradient>
+    <linearGradient id="amberGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f5c26f"/>
+      <stop offset="100%" stop-color="#e0973a"/>
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#6ee7b7"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5b6b8c"/>
+    </marker>
+  </defs>
+
+  <rect width="1200" height="360" fill="url(#bg)"/>
+
+  <!-- Title -->
+  <text x="600" y="48" text-anchor="middle" fill="#f3f6fb" font-size="30" font-weight="700" letter-spacing="0.5">
+    Concurrent Task Workers for Go
+  </text>
+  <text x="600" y="76" text-anchor="middle" fill="#8b9bc2" font-size="15" letter-spacing="0.3">
+    Scheduled or ticked execution · retries with panic recovery · graceful shutdown via context
+  </text>
+
+  <!-- Pipeline row -->
+  <g font-size="16" font-weight="600">
+
+    <!-- Stage 1: Schedule -->
+    <g transform="translate(70,140)" filter="url(#softShadow)">
+      <rect width="220" height="140" rx="14" fill="#0e1c26" stroke="url(#cyanGrad)" stroke-width="2"/>
+      <!-- clock/ticker icon -->
+      <g transform="translate(110,44)" stroke="#8fe0f0" stroke-width="2.5" fill="none" stroke-linecap="round">
+        <circle cx="0" cy="0" r="24"/>
+        <path d="M0,-24 L0,-30 M24,0 L30,0 M0,24 L0,30 M-24,0 L-30,0"/>
+        <path d="M0,0 L0,-14"/>
+        <path d="M0,0 L11,7"/>
+      </g>
+      <text x="110" y="100" text-anchor="middle" fill="#e3f7fc">Schedule</text>
+      <text x="110" y="122" text-anchor="middle" fill="#7fb8c9" font-size="12" font-weight="400">time.Ticker, ctx-aware</text>
+    </g>
+
+    <!-- Stage 2: Worker -->
+    <g transform="translate(350,140)" filter="url(#softShadow)">
+      <rect width="220" height="140" rx="14" fill="#101a2c" stroke="url(#blueGrad)" stroke-width="2"/>
+      <!-- concurrent lines converging (WaitGroup) icon -->
+      <g transform="translate(110,44)" stroke="#a9c6f7" stroke-width="2.5" fill="none" stroke-linecap="round">
+        <path d="M -22 -18 L -4 0"/>
+        <path d="M -22 0 L -4 0"/>
+        <path d="M -22 18 L -4 0"/>
+        <path d="M -4 0 L 22 0"/>
+        <circle cx="-4" cy="0" r="3" fill="#a9c6f7" stroke="none"/>
+      </g>
+      <text x="110" y="100" text-anchor="middle" fill="#e9f0fe">Worker</text>
+      <text x="110" y="122" text-anchor="middle" fill="#9ab2e0" font-size="12" font-weight="400">N concurrent execs, WaitGroup</text>
+    </g>
+
+    <!-- Stage 3: Task (retry + recover) -->
+    <g transform="translate(630,140)" filter="url(#softShadow)">
+      <rect width="220" height="140" rx="14" fill="#241c0e" stroke="url(#amberGrad)" stroke-width="2"/>
+      <!-- shield with checkmark icon -->
+      <g transform="translate(110,44)" stroke="#f5d59a" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M0,-22 L20,-13 L20,6 C20,18 11,25 0,29 C-11,25 -20,18 -20,6 L-20,-13 Z"/>
+        <path d="M-9,1 L-2,9 L11,-8"/>
+      </g>
+      <text x="110" y="100" text-anchor="middle" fill="#fbf0e0">Task</text>
+      <text x="110" y="122" text-anchor="middle" fill="#d1ab72" font-size="12" font-weight="400">retries + panic recovery</text>
+    </g>
+
+    <!-- Stage 4: Callback -->
+    <g transform="translate(910,140)" filter="url(#softShadow)">
+      <rect width="220" height="140" rx="14" fill="#0e1f19" stroke="url(#greenGrad)" stroke-width="2"/>
+      <!-- chain link icon -->
+      <g transform="translate(110,44)" stroke="#6ee7b7" stroke-width="2.5" fill="none" stroke-linecap="round">
+        <rect x="-22" y="-10" width="20" height="20" rx="10"/>
+        <rect x="2" y="-10" width="20" height="20" rx="10"/>
+      </g>
+      <text x="110" y="100" text-anchor="middle" fill="#e4fbf1">Callback</text>
+      <text x="110" y="122" text-anchor="middle" fill="#7fcbab" font-size="12" font-weight="400">nested step, own error path</text>
+    </g>
+
+  </g>
+
+  <!-- Arrows -->
+  <g stroke="#5b6b8c" stroke-width="2.5" marker-end="url(#arrow)">
+    <line x1="292" y1="210" x2="346" y2="210"/>
+    <line x1="572" y1="210" x2="626" y2="210"/>
+    <line x1="852" y1="210" x2="906" y2="210"/>
+  </g>
+
+  <!-- footer -->
+  <text x="600" y="336" text-anchor="middle" fill="#4d5c7d" font-size="12" letter-spacing="0.5">
+    github.com/Jeffersonmf/go-workers
+  </text>
+</svg>

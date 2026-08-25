@@ -1,115 +1,203 @@
-# Go-Workers
-[![License](https://img.shields.io/badge/license-NDA-blue)](https://github.com/libsql/libsql/blob/master/LICENSE.md) [![License](https://img.shields.io/badge/build-valid-red)](https://github.com/libsql/libsql/blob/master/LICENSE.md) [![GoDoc](https://godoc.org/github.com/jessevdk/go-flags?status.png)]() [![](https://img.shields.io/coveralls/jessevdk/go-flags.svg)]() [![Up to Date](https://github.com/ikatyang/emoji-cheat-sheet/workflows/Up%20to%20Date/badge.svg)]() 
+<p align="center">
+  <img src="./docs/assets/logo.svg" width="140" alt="go-workers logo" />
+</p>
 
-### Workers is a project whose purpose is to dynamically execute tasks and routines in Golang, defined through an instrumentator.
+# ⚙️ go-workers
 
-These tasks can be executed nested in a logical sequence or a flow, making use of intelligent callbacks and parallel executions through goroutines.
+![Go](https://img.shields.io/badge/go-1.27-00ADD8.svg?logo=go)
+![Tests](https://img.shields.io/badge/tests-20%20passing-brightgreen.svg)
+![Race](https://img.shields.io/badge/go%20test--race-clean-brightgreen.svg)
+![Lint](https://img.shields.io/badge/golangci--lint-0%20issues-brightgreen.svg)
+![Docker](https://img.shields.io/badge/docker-13.5MB%20image-blue.svg?logo=docker)
+![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)
 
+**Author:** [Jefferson Marchetti](mailto:jeffersonm.ferreira@gmail.com)
 
-The application follows design patterns commonly applied by the Golang community, with the most important parts contained in the **workermanager** package.
+![go-workers](./docs/assets/banner.svg)
 
-Below, we have an example of the definitions of the main data structures of the project:
+## Overview
 
-## ![Diagram Main Module](./struct_diagram.svg)
+A small library for running caller-defined task functions concurrently,
+on a schedule or as repeated ticks, with retries and panic recovery
+around every execution, and graceful shutdown wired through
+`context.Context`.
 
-### Extra Modules
+This is a rewrite of a personal project originally written in 2023.
+The rewrite is not cosmetic: the concurrency model had a real data
+race in its retry logic, a panic-recovery path that nothing ever
+called, and other issues documented with reproductions in
+[`docs/trade-offs.md`](./docs/trade-offs.md). Every fix there is backed
+by a test that fails without it.
 
-- **Configurations**[]()
-  - *Here we have modules capable of reading configuration in .env files and generic functions for dealing with the "environment"*
+## Features
 
-relational entities on the native code in Go.
-- Util
-  - Here we have several utilities of the solution such as system libraries "os"libraries, functions to create generic maps as well as slices, loggersm etc.
-- Terraform and Docker Infrastructures
-  - Files and scripts to support code infrastructure, containers and CICD.
+- Retries with panic recovery around every task execution: a panic in
+  a caller-supplied function is converted to an error, not a crashed
+  process.
+- Concurrent execution per tick, waited for with `sync.WaitGroup`:
+  `Worker.Run()` does not return until everything it started has
+  finished or been cancelled.
+- Scheduling via the standard library's `time.Ticker`, stopped through
+  `context.Context` cancellation, no separate `Stop()` mechanism to
+  keep in sync with the rest of the package.
+- Generic `TaskParams` (`SetParam[T]`/`GetParam[T]`) instead of one
+  method pair per supported type.
+- 20 tests, including `go test -race`, and a `TestMain` that fails the
+  suite on any leaked goroutine (`go.uber.org/goleak`).
+- Static binary, 13.5MB Docker image (`FROM scratch`, no cgo).
 
-<p><br />
+## Architecture
 
-- **Worker Manager Module** 
-
-  - The **Worker Manager** Module, which works together with the **Instrumentation** module, is capable of executing functions dynamically, using advanced techniques such as recursion, callbacks, and reflection triggers, allowing the assembly of workflows, passing and receiving inputs and outputs, totally dynamic and concurrent.
-
-    <p><br />
-
-### **How can we create a Worker?** <br />
-
-First of all, let's declare our functions that will be executed and managed by the Worker. As in the example below we have addCompaniesStep001. Its purpose is to insert a new Company.
-
-see the example: [**addCompaniesStep001**]
-
-```go
-  //This is an example:
-  func LoadRunner(args []string) {
- mainCtx := context.Background()
- db := util.CockroachConn(mainCtx)
- defer db.Close()
-
- boil.SetDB(db)
-
- addCompaniesStep001 := func(ctx context.Context, taskArg workermanager.TaskParams) (workermanager.TaskParams, error) {
-  companyID := gofakeit.UUID()
-
-  company := generator.GenerateFakeCompany(companyID)
-  err := company.InsertG(ctx, boil.Infer())
-  if err != nil {
-   util.Sugar.Infof(err.Error())
-  }
-
-  taskArg.SetStringParam("companyID", companyID)
-
-  return taskArg, err
- }
+```mermaid
+flowchart LR
+    S["Schedule\ntime.Ticker, ctx-aware"] --> W["Worker\nN concurrent execs, WaitGroup"]
+    W --> T["Task\ndispatchWithRetry + safeDispatch"]
+    T -->|success| C["NestedCallback"]
+    T -->|retries exhausted| E["OnError"]
+    C -->|error| E
 ```
 
-Next, we will declare the second step in which it will be executed in a callback corresponding to the end of the first Step. [**addUserStep002**]
+Every task execution goes through `safeDispatch` (panic → error via
+`recover()`) inside `dispatchWithRetry` (up to `MaxRetries` sequential
+attempts, in the same goroutine, so there is nothing to race on across
+goroutines). Failures that exhaust their retries, and `NestedCallback` errors,
+both go through the same `OnError` hook. Details in
+[`docs/design.md`](./docs/design.md).
 
-Note that each execution will return a corresponding callback and this callback may contain a next function that in turn will return another callback in the sequence, thus having a recursive flow, as if it were a linked list of functions with returns.
+## Requirements
 
-```go
-    addUserStep002 := func(ctx context.Context, taskArg workermanager.TaskParams)  error {
-      companyId, _ := taskArg.GetStringParam("companyID")
+- Go 1.27+
+- Docker (optional, for the container build)
 
-      userProfilePictures := generator.GenerateUserProfilePic(companyId)
+## Running it
 
-      err := userProfilePictures.InsertG(ctx, boil.Infer())
-      if err != nil {
-        util.Sugar.Infof(err.Error())
-        return taskArg, err
-      }
-      user := generator.GenerateUser(companyId, userProfilePictures.ID)
-      err = user.InsertG(ctx, boil.Infer())
-      if err != nil {
-        util.Sugar.Infof(err.Error())
-      }
-
-      params := workermanager.NewTaskParams()
-      params.SetStringParam("userProfilePicID", userProfilePictures.ID)
-      params.SetStringParam("companyID", companyId)
-
-      return taskArg, err
-    }
+```bash
+make run
 ```
 
-Now we have the most important part, which is precisely the declaration of the Worker and the beginning of the execution of our interconnected tasks.
-[**yourTaskFunc001**]
+Runs the bundled example (`main.go`): a worker scheduled every 5
+seconds, fetching a small in-memory batch and logging each record.
+`Ctrl+C` triggers a graceful shutdown (`signal.NotifyContext`): the
+in-flight tick finishes before the process exits.
 
-```go
-  func yourTaskFunc001 {
-  ...
-    workermanager.Worker{
-      SourceContext: mainCtx,
-      Instrumentation: workermanager.Instrumentation{
-        TaskArguments:  workermanager.NewTaskParams(),
-        FuncDispatcher: addCompaniesStep001,
-        NestedCallback: addUserStep002,
-        FuncName:       "addCompanies",
-      },
-      ExecsPerTick: companiesToCreatePerTick,
-      TickDuration: time.Second * 20,
-    }.Run()
-    util.Sugar.Infof("Finished")
-  }
+## Verification
+
+```bash
+git clone <this-repository> && cd go-workers
+make check
 ```
 
-- **Tests**
-  - The automated test routines trigger the simulator and try to reach the limits of CPU resources, using resources such as goroutines, mutex, channels, and blocks with thousands of concurrent processes.
+`make check` runs `gofmt -l`, `golangci-lint run`, and the full test
+suite with the race detector. Expected output:
+
+```text
+0 issues.
+ok  	github.com/Jeffersonmf/go-workers/pkg/util
+ok  	github.com/Jeffersonmf/go-workers/pkg/worker_manager
+```
+
+`gofmt -l` and `golangci-lint` produce no output when there are no
+problems. Requires Go 1.27+ and `golangci-lint` on `PATH`.
+
+To verify the Docker image:
+
+```bash
+make docker-build
+docker run -d --name gw-check go-workers:latest
+sleep 2
+docker logs gw-check                # should show "go-workers example starting" + persisted records
+docker stop gw-check                # sends SIGTERM; should exit cleanly, no forced kill
+docker rm gw-check
+```
+
+## Tests
+
+20 tests (`make test-race`):
+
+```mermaid
+flowchart TB
+    subgraph WM["16 in pkg/worker_manager"]
+        WM1["TaskParams: generic round trip, wrong type, missing key, Clone independence"]
+        WM2["Worker: retries without racing (-race), exhausted retries -> OnError, panic recovery, nested-callback errors"]
+        WM3["Worker: waits for every concurrent execution before returning, stops between ticks on ctx cancellation"]
+        WM4["Scheduler: runs immediately + on tick, stops on cancellation, Async doesn't block, Sync blocks until cancelled"]
+    end
+    subgraph U["4 in pkg/util"]
+        U1["NewUUID: parsable v4, not constant across calls"]
+        U2["ReadParameter: reads a real env var, unset key returns \"\" not \"<nil>\""]
+    end
+```
+
+`TestMain` wraps the `worker_manager` suite in
+`goleak.VerifyTestMain`, so a goroutine leak anywhere fails the build,
+not just a silently growing process.
+
+## Development
+
+```bash
+make help         # lists every command with a description
+make build         # go build -o bin/go-workers .
+make test-race       # go test ./... -race
+make test-cover        # go test ./... -cover
+make lint                # golangci-lint run
+make fmt                   # gofmt -w .
+make check                    # fmt-check + lint + test-race (what CI runs)
+```
+
+## Docker
+
+```bash
+make docker-build   # 13.5MB final image
+make docker-run      # runs the example inside the container
+```
+
+Multi-stage build: `golang:1.27-bookworm` compiles a static binary
+(`CGO_ENABLED=0`; nothing in this module's dependency tree uses cgo),
+the final image is `FROM scratch`, no shell, no dynamic libc.
+
+## Project structure
+
+```
+pkg/
+  util/
+    logger.go            Sugar (zap), set via a var initializer, see docs/trade-offs.md #2
+    config_manager.go       .env + real env vars via viper, hot reload
+    os.go                     NewUUID, LogMemStats
+  worker_manager/
+    instrumentation.go   TaskParams (generic Set/GetParam), Instrumentation
+    scheduler.go            runOnSchedule (time.Ticker, ctx-cancellable)
+    worker.go                 Worker: retries, panic recovery, WaitGroup
+    error_handling.go            TaskError
+main.go               runnable example: scheduled worker + graceful shutdown
+docs/
+  design.md               architecture and the concurrency redesign
+  trade-offs.md              10 documented findings, each with a reproduction
+  assets/                       banner.svg, logo.svg
+.github/workflows/ci.yml   fmt + lint + test -race + docker build, on every push
+```
+
+## Technical decisions
+
+Summary; full detail and reproductions in
+[`docs/trade-offs.md`](./docs/trade-offs.md):
+
+1. **Retry logic rebuilt**: the original raced a goroutine's channel
+   send against a non-blocking `select` in the caller, so retries almost
+   never actually fired. Now sequential, in the same goroutine.
+2. **Panic recovery actually wired in**: a recovery method existed but
+   nothing called it. `safeDispatch` wraps every task execution.
+3. **`Worker.Run()` waits for its goroutines**: the original returned
+   before spawned executions finished.
+4. **`time.Ticker` instead of `go-co-op/gocron`**: the only use was
+   "run every N seconds", already in the standard library.
+5. **Generics for `TaskParams`**: two functions instead of fourteen
+   near-identical methods.
+
+## License
+
+[MIT](./LICENSE)
+
+## Contact
+
+**Jefferson Marchetti**
+[jeffersonm.ferreira@gmail.com](mailto:jeffersonm.ferreira@gmail.com)
