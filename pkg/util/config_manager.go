@@ -1,61 +1,77 @@
 package util
 
 import (
-	"errors"
-	"io/fs"
+	"bufio"
+	"os"
+	"strings"
+	"sync"
+)
 
-	"github.com/fsnotify/fsnotify"
-	"github.com/spf13/viper"
+const envFilePath = ".env"
+
+var (
+	envFileMu   sync.RWMutex
+	envFileVars = map[string]string{}
 )
 
 func init() {
-	viper.SetConfigFile(".env")
-	viper.AutomaticEnv()
+	loadEnvFile()
+}
 
-	// A missing .env is not an error: configuration may come entirely
-	// from real environment variables (the common case in a
-	// container). Anything else reading the file (permissions,
-	// malformed content) is worth knowing about, so only the
-	// not-found case is swallowed.
-	//
-	// viper.ConfigFileNotFoundError is what ReadInConfig returns when a
-	// config *name* (SetConfigName + AddConfigPath) was searched for
-	// and not found in any path. SetConfigFile above sets an explicit
-	// path instead, so a missing file surfaces as the plain OS error
-	// from opening it — checking for the wrong error type here silently
-	// never matched, and every missing-.env startup logged a warning
-	// that was meant to be filtered out.
-	if err := viper.ReadInConfig(); err != nil {
-		if !errors.Is(err, fs.ErrNotExist) {
-			Sugar.Warnf("could not read .env: %v", err)
+// ReadParameter returns the value of a configuration key: a real
+// environment variable takes precedence, then a value from .env, then
+// "" if neither is set.
+//
+// This replaced spf13/viper, which pulled in roughly a dozen
+// transitive dependencies (afero, cast, pflag, a TOML/HCL/INI parser,
+// ...) to do what this package needs in about twenty lines: read
+// KEY=VALUE lines from one file and fall back to real env vars. Viper
+// supports config formats and sources (YAML, remote config stores,
+// live directory watching) that this project never used.
+func ReadParameter(key string) string {
+	if value, ok := os.LookupEnv(key); ok {
+		return value
+	}
+
+	envFileMu.RLock()
+	defer envFileMu.RUnlock()
+	return envFileVars[key]
+}
+
+func loadEnvFile() {
+	file, err := os.Open(envFilePath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			Logger.Warn("could not read .env", "error", err)
 		}
 		return
 	}
-
-	watchConfig()
-}
-
-// ReadParameter returns the value of a configuration key, sourced from
-// .env if present and overridden by an actual environment variable of
-// the same name, or "" if it is not set.
-//
-// The original implementation was `fmt.Sprint(viper.Get(parameter))`:
-// fmt.Sprint on a nil `any` (exactly what viper.Get returns for an
-// unset key) prints the four-character string "<nil>", not "". Every
-// caller checking ReadParameter(key) != "" to mean "is it set" was
-// silently wrong for every unset key. viper.GetString does the right
-// type coercion, including for an unset key, directly.
-func ReadParameter(parameter string) string {
-	return viper.GetString(parameter)
-}
-
-func watchConfig() {
-	viper.WatchConfig()
-	viper.OnConfigChange(func(e fsnotify.Event) {
-		if err := viper.ReadInConfig(); err != nil {
-			Sugar.Warnf("config file changed but failed to reload: %v", err)
-			return
+	defer func() {
+		if cerr := file.Close(); cerr != nil {
+			Logger.Warn("could not close .env", "error", cerr)
 		}
-		Sugar.Infof("config file changed: %s", e.Name)
-	})
+	}()
+
+	parsed := make(map[string]string)
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		parsed[strings.TrimSpace(key)] = strings.Trim(strings.TrimSpace(value), `"'`)
+	}
+	if err := scanner.Err(); err != nil {
+		Logger.Warn("could not parse .env", "error", err)
+		return
+	}
+
+	envFileMu.Lock()
+	envFileVars = parsed
+	envFileMu.Unlock()
 }

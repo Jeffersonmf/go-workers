@@ -5,10 +5,11 @@
 # ⚙️ go-workers
 
 ![Go](https://img.shields.io/badge/go-1.27-00ADD8.svg?logo=go)
-![Tests](https://img.shields.io/badge/tests-20%20passing-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-23%20passing-brightgreen.svg)
 ![Race](https://img.shields.io/badge/go%20test--race-clean-brightgreen.svg)
 ![Lint](https://img.shields.io/badge/golangci--lint-0%20issues-brightgreen.svg)
-![Docker](https://img.shields.io/badge/docker-13.5MB%20image-blue.svg?logo=docker)
+![Deps](https://img.shields.io/badge/direct%20deps-1%20(google%2Fuuid)-brightgreen.svg)
+![Docker](https://img.shields.io/badge/docker-7MB%20image-blue.svg?logo=docker)
 ![License](https://img.shields.io/badge/license-MIT-lightgrey.svg)
 
 **Author:** [Jefferson Marchetti](mailto:jeffersonm.ferreira@gmail.com)
@@ -27,7 +28,10 @@ The rewrite is not cosmetic: the concurrency model had a real data
 race in its retry logic, a panic-recovery path that nothing ever
 called, and other issues documented with reproductions in
 [`docs/trade-offs.md`](./docs/trade-offs.md). Every fix there is backed
-by a test that fails without it.
+by a test that fails without it. A second pass then replaced the
+library stack itself (`zap` → `log/slog`, `viper`+`fsnotify` → a
+20-line `.env` loader), taking the module's direct dependencies from
+four down to one.
 
 ## Features
 
@@ -42,9 +46,12 @@ by a test that fails without it.
   keep in sync with the rest of the package.
 - Generic `TaskParams` (`SetParam[T]`/`GetParam[T]`) instead of one
   method pair per supported type.
-- 20 tests, including `go test -race`, and a `TestMain` that fails the
+- Structured logging via the standard library's `log/slog`, config via
+  a dependency-free `.env` + real env var loader: one direct
+  dependency in the whole module (`google/uuid`).
+- 23 tests, including `go test -race`, and a `TestMain` that fails the
   suite on any leaked goroutine (`go.uber.org/goleak`).
-- Static binary, 13.5MB Docker image (`FROM scratch`, no cgo).
+- Static binary, 7MB Docker image (`FROM scratch`, no cgo).
 
 ## Architecture
 
@@ -112,7 +119,7 @@ docker rm gw-check
 
 ## Tests
 
-20 tests (`make test-race`):
+23 tests (`make test-race`):
 
 ```mermaid
 flowchart TB
@@ -122,9 +129,10 @@ flowchart TB
         WM3["Worker: waits for every concurrent execution before returning, stops between ticks on ctx cancellation"]
         WM4["Scheduler: runs immediately + on tick, stops on cancellation, Async doesn't block, Sync blocks until cancelled"]
     end
-    subgraph U["4 in pkg/util"]
+    subgraph U["7 in pkg/util"]
         U1["NewUUID: parsable v4, not constant across calls"]
-        U2["ReadParameter: reads a real env var, unset key returns \"\" not \"<nil>\""]
+        U2["ReadParameter: real env var wins over .env, unset key returns an empty string instead of the literal nil"]
+        U3["loadEnvFile: parses a real .env, missing file is a no-op, does not panic"]
     end
 ```
 
@@ -147,7 +155,7 @@ make check                    # fmt-check + lint + test-race (what CI runs)
 ## Docker
 
 ```bash
-make docker-build   # 13.5MB final image
+make docker-build   # 7MB final image
 make docker-run      # runs the example inside the container
 ```
 
@@ -160,8 +168,8 @@ the final image is `FROM scratch`, no shell, no dynamic libc.
 ```
 pkg/
   util/
-    logger.go            Sugar (zap), set via a var initializer, see docs/trade-offs.md #2
-    config_manager.go       .env + real env vars via viper, hot reload
+    logger.go            Logger (log/slog), set via a var initializer, see docs/trade-offs.md #2, #11
+    config_manager.go       .env + real env vars, zero dependencies, see docs/trade-offs.md #12
     os.go                     NewUUID, LogMemStats
   worker_manager/
     instrumentation.go   TaskParams (generic Set/GetParam), Instrumentation
@@ -170,8 +178,8 @@ pkg/
     error_handling.go            TaskError
 main.go               runnable example: scheduled worker + graceful shutdown
 docs/
-  design.md               architecture and the concurrency redesign
-  trade-offs.md              10 documented findings, each with a reproduction
+  design.md               architecture, the concurrency redesign, and the library swap
+  trade-offs.md              12 documented findings, each with a reproduction
   assets/                       banner.svg, logo.svg
 .github/workflows/ci.yml   fmt + lint + test -race + docker build, on every push
 ```
@@ -192,6 +200,10 @@ Summary; full detail and reproductions in
    "run every N seconds", already in the standard library.
 5. **Generics for `TaskParams`**: two functions instead of fourteen
    near-identical methods.
+6. **`log/slog` instead of `zap`, a dependency-free `.env` loader
+   instead of `viper`+`fsnotify`**: the module's direct dependencies
+   went from four to one, and `slog.New`'s inability to fail
+   structurally eliminates the nil-logger bug class from point 2.
 
 ## License
 

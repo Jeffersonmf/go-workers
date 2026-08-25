@@ -30,7 +30,7 @@ type Worker struct {
 
 	// OnError is called for every task failure that exhausts its
 	// retries, and for every NestedCallback failure. A nil OnError logs
-	// through util.Sugar instead. This replaced a global package-level
+	// through util.Logger instead. This replaced a global package-level
 	// error-handling struct (WorkerError) that every Worker in the
 	// process shared and mutated, which meant one worker's error state
 	// could be overwritten by another's before anything read it.
@@ -63,7 +63,7 @@ func (wr Worker) blockToRun() {
 	if wr.TickDuration <= 0 || wr.ExecsPerTick == nil {
 		start := time.Now()
 		wr.executeTask(ctx, wr.Instrumentation.TaskArguments.Clone())
-		util.Sugar.Infow("worker finished",
+		util.Logger.Info("worker finished",
 			"name", wr.Instrumentation.FuncName,
 			"elapsed", time.Since(start).String(),
 		)
@@ -112,7 +112,7 @@ func (wr Worker) runTicks(ctx context.Context) {
 
 		elapsed := time.Since(start)
 		if elapsed >= wr.TickDuration {
-			util.Sugar.Warnw("tick took longer than the configured tick duration",
+			util.Logger.Warn("tick took longer than the configured tick duration",
 				"worker", wr.Instrumentation.FuncName,
 				"tick", tick,
 				"elapsed", elapsed.String(),
@@ -168,7 +168,7 @@ func (wr Worker) dispatchWithRetry(ctx context.Context, taskArg TaskParams, maxR
 			return result, attempt, nil
 		}
 
-		util.Sugar.Warnw("task attempt failed",
+		util.Logger.Warn("task attempt failed",
 			"worker", wr.Instrumentation.FuncName,
 			"attempt", attempt,
 			"maxAttempts", maxRetries,
@@ -200,7 +200,7 @@ func (wr Worker) reportError(taskErr *TaskError) {
 		wr.OnError(taskErr)
 		return
 	}
-	util.Sugar.Errorw("task failed",
+	util.Logger.Error("task failed",
 		"task", taskErr.TaskName,
 		"attempt", taskErr.Attempt,
 		"error", taskErr.Err,

@@ -20,8 +20,7 @@ type record struct {
 }
 
 func main() {
-	defer util.Sync()
-	util.Sugar.Info("go-workers example starting")
+	util.Logger.Info("go-workers example starting")
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -41,7 +40,7 @@ func main() {
 		}
 
 		for _, r := range batch {
-			util.Sugar.Infow("persisted record", "id", r.ID, "name", r.Name)
+			util.Logger.Info("persisted record", "id", r.ID, "name", r.Name)
 		}
 		return nil
 	}
@@ -59,9 +58,9 @@ func main() {
 			FuncName:       "fetch-and-persist-batch",
 		},
 		OnError: func(err *workermanager.TaskError) {
-			util.Sugar.Errorw("worker step failed", "task", err.TaskName, "attempt", err.Attempt, "error", err.Err)
+			util.Logger.Error("worker step failed", "task", err.TaskName, "attempt", err.Attempt, "error", err.Err)
 		},
 	}.Run()
 
-	util.Sugar.Info("go-workers example stopped")
+	util.Logger.Info("go-workers example stopped")
 }

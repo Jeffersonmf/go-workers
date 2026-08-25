@@ -23,7 +23,7 @@ func NewUUID() string {
 func LogMemStats() {
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
-	Sugar.Infow("memory stats",
+	Logger.Info("memory stats",
 		"allocBytes", mem.Alloc,
 		"totalAllocBytes", mem.TotalAlloc,
 		"heapAllocBytes", mem.HeapAlloc,

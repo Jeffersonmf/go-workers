@@ -95,6 +95,23 @@ o `context.Context` do Worker é cancelado, em vez de precisar de uma
 função `Stop` separada e desacoplada do mecanismo de cancelamento que o
 resto do pacote já usa.
 
+## `log/slog` no lugar do `zap`, `.env` sem dependências no lugar do `viper`
+
+Depois da primeira reforma (que já tinha corrigido bugs reais dentro do
+zap/viper, ver `docs/trade-offs.md` itens 2 a 4), a segunda passagem
+substituiu as próprias bibliotecas. `Logger` (`pkg/util/logger.go`) é
+um `*slog.Logger` (biblioteca padrão desde Go 1.21) em vez de um
+`*zap.SugaredLogger`; `ReadParameter` (`pkg/util/config_manager.go`) lê
+`.env` com `bufio.Scanner` e cai para `os.LookupEnv`, sem o viper.
+
+Isso não é só redução de dependências pelo número: `slog.New` não
+retorna `error`, então o bug do item 2 (logger `nil` dependendo da
+ordem de `init()` entre arquivos) deixa de ter como existir, não só
+passa a estar corrigido. Detalhe completo em
+[`trade-offs.md`](./trade-offs.md#11-substituído-zap-por-logslog-biblioteca-padrão-desde-go-121)
+e
+[`trade-offs.md`](./trade-offs.md#12-substituído-viper--fsnotify-por-um-loader-de-env-sem-dependências).
+
 ## Encerramento gracioso end to end
 
 O binário de exemplo (`main.go`) usa `signal.NotifyContext` para

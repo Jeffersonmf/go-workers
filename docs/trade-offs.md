@@ -19,6 +19,11 @@ github.com/Jeffersonmf/go-workers`.
 
 ## 2. `Sugar` podia ser `nil` dependendo da ordem alfabética dos arquivos do pacote
 
+Mantido como registro histórico de um bug real encontrado e corrigido.
+A biblioteca envolvida (zap) foi removida depois (item 11); com
+`log/slog`, essa classe de bug deixou de ser possível, não só
+corrigida.
+
 `pkg/util/logger.go` inicializava o logger `Sugar` dentro de um
 `init()`. `pkg/util/config_manager.go` também tinha um `init()` que
 loga através de `Sugar` em caso de erro. A especificação de Go garante
@@ -40,6 +45,11 @@ específica.
 
 ## 3. `viper.ConfigFileNotFoundError` era o tipo de erro errado para checar
 
+Mantido como registro histórico. O viper foi removido depois (item
+12) em favor de um loader de `.env` sem dependências; esta entrada
+documenta um bug real que existiu enquanto o viper ainda estava no
+projeto.
+
 O código original (e a primeira tentativa de correção) verificava `err.
 (viper.ConfigFileNotFoundError)` para distinguir "`.env` não existe" de
 outros erros de leitura. Esse tipo é o que `ReadInConfig` retorna
@@ -53,6 +63,9 @@ config vem de variáveis de ambiente reais) logava um aviso que deveria
 ter sido silencioso. Corrigido com `errors.Is(err, fs.ErrNotExist)`.
 
 ## 4. `fmt.Sprint(nil)` retorna a string `"<nil>"`, não `""`
+
+Mantido como registro histórico; ver a nota no item 3. O `ReadParameter`
+atual (item 12) não passa mais por `viper.Get`.
 
 `ReadParameter` era `fmt.Sprint(viper.Get(parameter))`. Para uma chave
 não definida, `viper.Get` retorna `nil` (um `any` nulo), e
@@ -137,3 +150,42 @@ projeto interno. O histórico foi comprimido para um único commit antes
 de qualquer trabalho novo, removendo essas referências do histórico
 publicado por completo, em vez de tentar editar commits antigos um a
 um.
+
+## 11. Substituído `zap` por `log/slog` (biblioteca padrão desde Go 1.21)
+
+`Sugar` era um `*zap.SugaredLogger`, construído por `zap.NewProduction()`
+dentro de um `init()`. `zap.NewProduction()` pode falhar (retorna um
+`error`), o que exigia um caminho de fallback só para esse caso raro,
+e foi exatamente a peça em volta da qual o bug do item 2 aconteceu.
+`slog.New` nunca falha: não há `error` para tratar nem logger de
+fallback para construir, então a classe inteira de bug do item 2 deixa
+de ter como acontecer, não só passa a estar corrigida. Quase todo
+ponto de log do projeto já usava o estilo chave-valor do zap
+(`Infow`/`Warnw`/`Errorw`), que tem a mesma forma dos métodos
+`Info`/`Warn`/`Error` do `slog`, então a migração dos call sites foi
+mecânica. O nome exportado mudou de `Sugar` para `Logger`, acompanhando
+o tipo (`*slog.Logger`, não mais um logger "sugared" com API dupla
+printf/chave-valor).
+
+## 12. Substituído `viper` + `fsnotify` por um loader de `.env` sem dependências
+
+O uso real de configuração neste projeto sempre foi: ler `KEY=VALUE`
+de um `.env`, com uma variável de ambiente real tendo prioridade. O
+viper resolve isso e muito mais (YAML/TOML/HCL/INI, config remota,
+watch de diretório), trazendo cerca de uma dezena de dependências
+transitivas para uma necessidade de umas vinte linhas de código.
+`pkg/util/config_manager.go` agora faz o parse do `.env` diretamente
+(`bufio.Scanner` + `strings.Cut`) num `map[string]string` protegido por
+`sync.RWMutex`, e `ReadParameter` consulta `os.LookupEnv` primeiro. O
+recurso de hot-reload via `fsnotify.WatchConfig` foi removido junto: um
+worker de longa duração normalmente é reiniciado pela orquestração
+(rolling restart) quando a configuração muda, não recarrega variáveis
+de ambiente em memória, e nada no projeto testava esse caminho.
+Coberto por `TestLoadEnvFile_PopulatesReadParameterFromDotEnv`,
+`TestReadParameter_RealEnvVarOverridesDotEnv` e
+`TestLoadEnvFile_MissingFileLeavesNoValuesAndDoesNotPanic`.
+
+Resultado: a árvore de dependências caiu de `viper` + `zap` + `fsnotify`
+e cerca de vinte transitivas para uma única dependência direta
+(`github.com/google/uuid`) mais `go.uber.org/goleak`, usado só em
+teste.
